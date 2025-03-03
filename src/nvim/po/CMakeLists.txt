@@ -1,9 +1,18 @@
+option(ENABLE_TRANSLATIONS "Localizations to build" OFF)
+if(NOT ENABLE_TRANSLATIONS)
+  return()
+endif()
+
 find_package(Gettext REQUIRED)
 find_program(XGETTEXT_PRG xgettext)
 find_program(ICONV_PRG iconv)
+mark_as_advanced(
+  GETTEXT_MSGFMT_EXECUTABLE
+  GETTEXT_MSGMERGE_EXECUTABLE
+  ICONV_PRG
+  XGETTEXT_PRG)
 
-option(LANGUAGES "Localizations to build")
-if(NOT LANGUAGES)
+if(HAVE_WORKING_LIBINTL AND GETTEXT_FOUND AND XGETTEXT_PRG AND ICONV_PRG)
   set(LANGUAGES
     af
     ca
@@ -31,9 +40,7 @@ if(NOT LANGUAGES)
     vi
     zh_CN.UTF-8
     zh_TW.UTF-8)
-endif()
 
-if(HAVE_WORKING_LIBINTL AND GETTEXT_FOUND AND XGETTEXT_PRG AND ICONV_PRG)
   set(ENV{OLD_PO_FILE_INPUT} yes)
   set(ENV{OLD_PO_FILE_OUTPUT} yes)
 
@@ -48,16 +55,18 @@ if(HAVE_WORKING_LIBINTL AND GETTEXT_FOUND AND XGETTEXT_PRG AND ICONV_PRG)
   list(SORT NVIM_RELATIVE_SOURCES)
   add_custom_command(
     OUTPUT ${NVIM_POT}
-    COMMAND $<TARGET_FILE:nvim> -u NONE -i NONE -n --headless --cmd "set cpo+=+"
-      -S ${CMAKE_CURRENT_SOURCE_DIR}/tojavascript.vim ${NVIM_POT} ${PROJECT_SOURCE_DIR}/runtime/optwin.vim
+    COMMAND $<TARGET_FILE:nvim_bin> -u NONE -i NONE -n --headless --cmd "set cpo+=+"
+      -c "silent source ${CMAKE_CURRENT_SOURCE_DIR}/tojavascript.vim"
+      ${NVIM_POT} ${PROJECT_SOURCE_DIR}/runtime/optwin.vim
     COMMAND ${XGETTEXT_PRG} -o ${NVIM_POT} --default-domain=nvim
       --add-comments --keyword=_ --keyword=N_ --keyword=NGETTEXT:1,2
       -D ${CMAKE_CURRENT_SOURCE_DIR} -D ${CMAKE_CURRENT_BINARY_DIR}
       ${NVIM_RELATIVE_SOURCES} optwin.js
-    COMMAND $<TARGET_FILE:nvim> -u NONE -i NONE -n --headless --cmd "set cpo+=+"
-      -S ${CMAKE_CURRENT_SOURCE_DIR}/fixfilenames.vim ${NVIM_POT} ../../../runtime/optwin.vim
+    COMMAND $<TARGET_FILE:nvim_bin> -u NONE -i NONE -n --headless --cmd "set cpo+=+"
+      -c "silent source ${CMAKE_CURRENT_SOURCE_DIR}/fixfilenames.vim"
+      ${NVIM_POT} ${PROJECT_SOURCE_DIR}/runtime/optwin.vim
     VERBATIM
-    DEPENDS ${NVIM_SOURCES} nvim nvim_runtime_deps)
+    DEPENDS ${NVIM_SOURCES} nvim_bin nvim_runtime_deps)
 
   set(LANGUAGE_MO_FILES)
   set(UPDATE_PO_TARGETS)
@@ -83,14 +92,13 @@ if(HAVE_WORKING_LIBINTL AND GETTEXT_FOUND AND XGETTEXT_PRG AND ICONV_PRG)
     set(poFile ${CMAKE_CURRENT_SOURCE_DIR}/${name}.po)
 
     add_custom_target(check-po-${name}
-      COMMAND $<TARGET_FILE:nvim> -u NONE -n -e
+      COMMAND $<TARGET_FILE:nvim_bin> -u NONE -n -e
           -S ${CMAKE_CURRENT_SOURCE_DIR}/check.vim
           -c "if error == 0 | q | endif" -c cq ${poFile} ||
           ${CMAKE_COMMAND} -E echo "${name}.po failed the check."
       COMMENT "Checking ${name}.po"
       VERBATIM
       DEPENDS ${poFile})
-    set_target_properties(check-po-${name} PROPERTIES FOLDER po/check)
   endmacro()
 
   macro(BuildPoIconvGenericWithCharset
@@ -100,12 +108,12 @@ if(HAVE_WORKING_LIBINTL AND GETTEXT_FOUND AND XGETTEXT_PRG AND ICONV_PRG)
 
     add_custom_target(update-po-${lang}
       COMMAND ${CMAKE_COMMAND}
-        -DICONV_PRG=${ICONV_PRG}
-        -DINPUT_FILE=${inputFile}
-        -DOUTPUT_FILE=${outputFile}
-        -DINPUT_ENC=${inputEnc}
-        -DOUTPUT_ENC=${outputEnc}
-        -DOUTPUT_CHARSET=${outputCharSet}
+        -D ICONV_PRG=${ICONV_PRG}
+        -D INPUT_FILE=${inputFile}
+        -D OUTPUT_FILE=${outputFile}
+        -D INPUT_ENC=${inputEnc}
+        -D OUTPUT_ENC=${outputEnc}
+        -D OUTPUT_CHARSET=${outputCharSet}
         -P ${PROJECT_SOURCE_DIR}/cmake/ConvertPo.cmake
       COMMENT "Updating ${outputName}.po"
       DEPENDS ${inputFile})
@@ -177,9 +185,8 @@ if(HAVE_WORKING_LIBINTL AND GETTEXT_FOUND AND XGETTEXT_PRG AND ICONV_PRG)
 
     BuildMo(${LANGUAGE})
   endforeach()
-  set_target_properties(${UPDATE_PO_TARGETS} PROPERTIES FOLDER po/update)
 
-  add_custom_target(translations ALL DEPENDS ${LANGUAGE_MO_FILES})
+  add_custom_target(nvim_translations DEPENDS ${LANGUAGE_MO_FILES})
   add_custom_target(update-po DEPENDS ${UPDATE_PO_TARGETS})
-  set_target_properties(translations update-po PROPERTIES FOLDER po)
+  add_dependencies(nvim nvim_translations)
 endif()
