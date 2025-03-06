@@ -3,10 +3,10 @@
 
                     LUV REFERENCE MANUAL
 
-								      *luvref*
+                                                                        *luvref*
 This file documents the Lua bindings for the LibUV library which is used for
-Nvim's event-loop and is accessible from Lua via |vim.loop| (e.g., |uv.version()|
-is exposed as `vim.loop.version()`).
+Nvim's event-loop and is accessible from Lua via |vim.uv| (e.g., |uv.version()|
+is exposed as `vim.uv.version()`).
 
 For information about this manual, see |luv-credits|.
 
@@ -24,12 +24,12 @@ be used in other Lua environments.
 More information about the core libuv library can be found at the original
 libuv documentation page (https://docs.libuv.org/).
 
-TCP Echo Server Example~
+TCP Echo Server Example ~
 
 Here is a small example showing a TCP echo server:
 
-    >
-    local uv = vim.loop
+    >lua
+    local uv = vim.uv
 
     local server = uv.new_tcp()
     server:bind("127.0.0.1", 1337)
@@ -51,15 +51,15 @@ Here is a small example showing a TCP echo server:
     uv.run() -- an explicit run call is necessary outside of luvit
 <
 
-Module Layout~
+Module Layout ~
 
 The luv library contains a single Lua module referred to hereafter as `uv` for
 simplicity. This module consists mostly of functions with names corresponding
 to their original libuv versions. For example, the libuv function
-`uv_tcp_bind` has a luv version at |uv.tcp_bind()|. Currently, only one
-non-function field exists: `uv.constants`, which is a table.
+`uv_tcp_bind` has a luv version at |uv.tcp_bind()|. Currently, only two
+non-function fields exists: `uv.constants` and `uv.errno`, which are tables.
 
-Functions vs Methods~
+Functions vs Methods ~
 
 In addition to having simple functions, luv provides an optional method-style
 API. For example, `uv.tcp_bind(server, host, port)` can alternatively be
@@ -67,7 +67,7 @@ called as `server:bind(host, port)` . Note that the first argument `server`
 becomes the object and `tcp_` is removed from the function name. Method forms
 are documented below where they exist.
 
-Synchronous vs Asynchronous Functions~
+Synchronous vs Asynchronous Functions ~
 
 Functions that accept a callback are asynchronous. These functions may
 immediately return results to the caller to indicate their initial status, but
@@ -82,7 +82,7 @@ Some (generally FS and DNS) functions can behave either synchronously or
 asynchronously. If a callback is provided to these functions, they behave
 asynchronously; if no callback is provided, they behave synchronously.
 
-Pseudo-Types~
+Pseudo-Types ~
 
 Some unique types are defined. These are not actual types in Lua, but they are
 used here to facilitate documenting consistent behavior:
@@ -91,7 +91,7 @@ used here to facilitate documenting consistent behavior:
   metamethod
 - `buffer`: a `string` or a sequential `table` of `string`s
 - `threadargs`: variable arguments (`...`) of type `nil`, `boolean`, `number`,
-  `string`, or `userdata`
+  `string`, or `userdata`; number of arguments limited to 9.
 
 ==============================================================================
 CONTENTS                                                          *luv-contents*
@@ -102,6 +102,7 @@ Low-level implementation details and unexposed C functions and types are not
 documented here except for when they are relevant to behavior seen in the Lua
 module.
 
+- |luv-constants| — Constants
 - |luv-error-handling| — Error handling
 - |luv-version-checking| — Version checking
 - |uv_loop_t| — Event loop
@@ -131,12 +132,103 @@ module.
 - |luv-metrics-operations| — Metrics operations
 
 ==============================================================================
+CONSTANTS                                                        *luv-constants*
+
+As a Lua library, luv supports and encourages the use of lowercase strings to
+represent options. For example:
+>lua
+  -- signal start with string input
+  uv.signal_start("sigterm", function(signame)
+    print(signame) -- string output: "sigterm"
+  end)
+<
+However, luv also superficially exposes libuv constants in a Lua table at
+`uv.constants` where its keys are uppercase constant names and their associated
+values are integers defined internally by libuv. The values from this table may
+be supported as function arguments, but their use may not change the output
+type. For example:
+>lua
+  -- signal start with integer input
+  uv.signal_start(uv.constants.SIGTERM, function(signame)
+    print(signame) -- string output: "sigterm"
+  end)
+<
+The uppercase constants defined in `uv.constants` that have associated
+lowercase option strings are listed below.
+
+Address Families ~
+
+- `AF_UNIX`: "unix"
+- `AF_INET`: "inet"
+- `AF_INET6`: "inet6"
+- `AF_IPX`: "ipx"
+- `AF_NETLINK`: "netlink"
+- `AF_X25`: "x25"
+- `AF_AX25`: "as25"
+- `AF_ATMPVC`: "atmpvc"
+- `AF_APPLETALK`: "appletalk"
+- `AF_PACKET`: "packet"
+
+Signals ~
+
+- `SIGHUP`: "sighup"
+- `SIGINT`: "sigint"
+- `SIGQUIT`: "sigquit"
+- `SIGILL`: "sigill"
+- `SIGTRAP`: "sigtrap"
+- `SIGABRT`: "sigabrt"
+- `SIGIOT`: "sigiot"
+- `SIGBUS`: "sigbus"
+- `SIGFPE`: "sigfpe"
+- `SIGKILL`: "sigkill"
+- `SIGUSR1`: "sigusr1"
+- `SIGSEGV`: "sigsegv"
+- `SIGUSR2`: "sigusr2"
+- `SIGPIPE`: "sigpipe"
+- `SIGALRM`: "sigalrm"
+- `SIGTERM`: "sigterm"
+- `SIGCHLD`: "sigchld"
+- `SIGSTKFLT`: "sigstkflt"
+- `SIGCONT`: "sigcont"
+- `SIGSTOP`: "sigstop"
+- `SIGTSTP`: "sigtstp"
+- `SIGBREAK`: "sigbreak"
+- `SIGTTIN`: "sigttin"
+- `SIGTTOU`: "sigttou"
+- `SIGURG`: "sigurg"
+- `SIGXCPU`: "sigxcpu"
+- `SIGXFSZ`: "sigxfsz"
+- `SIGVTALRM`: "sigvtalrm"
+- `SIGPROF`: "sigprof"
+- `SIGWINCH`: "sigwinch"
+- `SIGIO`: "sigio"
+- `SIGPOLL`: "sigpoll"
+- `SIGLOST`: "siglost"
+- `SIGPWR`: "sigpwr"
+- `SIGSYS`: "sigsys"
+
+Socket Types ~
+
+- `SOCK_STREAM`: "stream"
+- `SOCK_DGRAM`: "dgram"
+- `SOCK_SEQPACKET`: "seqpacket"
+- `SOCK_RAW`: "raw"
+- `SOCK_RDM`: "rdm"
+
+TTY Modes ~
+
+- `TTY_MODE_NORMAL`: "normal"
+- `TTY_MODE_RAW`: "raw"
+- `TTY_MODE_IO`: "io"
+
+==============================================================================
 ERROR HANDLING                                              *luv-error-handling*
 
-In libuv, errors are negative numbered constants; however, these errors and
-the functions used to handle them are not exposed to luv users. Instead, if an
-internal error is encountered, the luv function will return to the caller an
-assertable `nil, err, name` tuple.
+In libuv, errors are represented by negative numbered constants. While these
+constants are made available in the `uv.errno` table, they are not returned by
+luv functions and the libuv functions used to handle them are not exposed.
+Instead, if an internal error is encountered, the failing luv function will
+return to the caller an assertable `nil, err, name` tuple:
 
 - `nil` idiomatically indicates failure
 - `err` is a string with the format `{name}: {message}`
@@ -150,6 +242,93 @@ This tuple is referred to below as the `fail` pseudo-type.
 When a function is called successfully, it will return either a value that is
 relevant to the operation of the function, or the integer `0` to indicate
 success, or sometimes nothing at all. These cases are documented below.
+
+`uv.errno`                                                              *uv.errno*
+
+Below is a list of known error names and error strings. See Libuv's "Error
+constants" page for further details.
+(https://docs.libuv.org/en/v1.x/errors.html#error-constants)
+
+- `E2BIG`: argument list too long.
+- `EACCES`: permission denied.
+- `EADDRINUSE`: address already in use.
+- `EADDRNOTAVAIL`: address not available.
+- `EAFNOSUPPORT`: address family not supported.
+- `EAGAIN`: resource temporarily unavailable.
+- `EAI_ADDRFAMILY`: address family not supported.
+- `EAI_AGAIN`: temporary failure.
+- `EAI_BADFLAGS`: bad ai_flags value.
+- `EAI_BADHINTS`: invalid value for hints.
+- `EAI_CANCELED`: request canceled.
+- `EAI_FAIL`: permanent failure.
+- `EAI_FAMILY`: ai_family not supported.
+- `EAI_MEMORY`: out of memory.
+- `EAI_NODATA`: no address.
+- `EAI_NONAME`: unknown node or service.
+- `EAI_OVERFLOW`: argument buffer overflow.
+- `EAI_PROTOCOL`: resolved protocol is unknown.
+- `EAI_SERVICE`: service not available for socket type.
+- `EAI_SOCKTYPE`: socket type not supported.
+- `EALREADY`: connection already in progress.
+- `EBADF`: bad file descriptor.
+- `EBUSY`: resource busy or locked.
+- `ECANCELED`: operation canceled.
+- `ECHARSET`: invalid Unicode character.
+- `ECONNABORTED`: software caused connection abort.
+- `ECONNREFUSED`: connection refused.
+- `ECONNRESET`: connection reset by peer.
+- `EDESTADDRREQ`: destination address required.
+- `EEXIST`: file already exists.
+- `EFAULT`: bad address in system call argument.
+- `EFBIG`: file too large.
+- `EHOSTUNREACH`: host is unreachable.
+- `EINTR`: interrupted system call.
+- `EINVAL`: invalid argument.
+- `EIO`: i/o error.
+- `EISCONN`: socket is already connected.
+- `EISDIR`: illegal operation on a directory.
+- `ELOOP`: too many symbolic links encountered.
+- `EMFILE`: too many open files.
+- `EMSGSIZE`: message too long.
+- `ENAMETOOLONG`: name too long.
+- `ENETDOWN`: network is down.
+- `ENETUNREACH`: network is unreachable.
+- `ENFILE`: file table overflow.
+- `ENOBUFS`: no buffer space available.
+- `ENODEV`: no such device.
+- `ENOENT`: no such file or directory.
+- `ENOMEM`: not enough memory.
+- `ENONET`: machine is not on the network.
+- `ENOPROTOOPT`: protocol not available.
+- `ENOSPC`: no space left on device.
+- `ENOSYS`: function not implemented.
+- `ENOTCONN`: socket is not connected.
+- `ENOTDIR`: not a directory.
+- `ENOTEMPTY`: directory not empty.
+- `ENOTSOCK`: socket operation on non-socket.
+- `ENOTSUP`: operation not supported on socket.
+- `EOVERFLOW`: value too large for defined data type.
+- `EPERM`: operation not permitted.
+- `EPIPE`: broken pipe.
+- `EPROTO`: protocol error.
+- `EPROTONOSUPPORT`: protocol not supported.
+- `EPROTOTYPE`: protocol wrong type for socket.
+- `ERANGE`: result too large.
+- `EROFS`: read-only file system.
+- `ESHUTDOWN`: cannot send after transport endpoint shutdown.
+- `ESPIPE`: invalid seek.
+- `ESRCH`: no such process.
+- `ETIMEDOUT`: connection timed out.
+- `ETXTBSY`: text file is busy.
+- `EXDEV`: cross-device link not permitted.
+- `UNKNOWN`: unknown error.
+- `EOF`: end of file.
+- `ENXIO`: no such device or address.
+- `EMLINK`: too many links.
+- `ENOTTY`: inappropriate ioctl for device.
+- `EFTYPE`: inappropriate file type or format.
+- `EILSEQ`: illegal byte sequence.
+- `ESOCKTNOSUPPORT`: socket type not supported.
 
 ==============================================================================
 VERSION CHECKING                                          *luv-version-checking*
@@ -250,7 +429,7 @@ uv.loop_configure({option}, {...})                         *uv.loop_configure()*
 
                 An example of a valid call to this function is:
 
-                    >
+                    >lua
                     uv.loop_configure("block_signal", "sigprof")
 <
 
@@ -343,7 +522,7 @@ uv.walk({callback})                                                  *uv.walk()*
 
                 Returns: Nothing.
 
-                    >
+                    >lua
                     -- Example usage of uv.walk to close all handles that
                     -- aren't already closing.
                     uv.walk(function (handle)
@@ -613,7 +792,7 @@ uv.new_timer()                                                  *uv.new_timer()*
 
                 Returns: `uv_timer_t userdata` or `fail`
 
-                    >
+                    >lua
                     -- Creating a simple setTimeout wrapper
                     local function setTimeout(timeout, callback)
                       local timer = uv.new_timer()
@@ -737,7 +916,7 @@ uv.timer_get_due_in({timer})                             *uv.timer_get_due_in()*
 Prepare handles will run the given callback once per loop iteration, right
 before polling for I/O.
 
-    >
+    >lua
     local prepare = uv.new_prepare()
     prepare:start(function()
       print("Before I/O polling")
@@ -749,7 +928,7 @@ uv.new_prepare()                                              *uv.new_prepare()*
                 Creates and initializes a new |uv_prepare_t|. Returns the Lua
                 userdata wrapping it.
 
-                Returns: `uv_prepare_t userdata` or `fail`
+                Returns: `uv_prepare_t userdata`
 
 uv.prepare_start({prepare}, {callback})                     *uv.prepare_start()*
 
@@ -782,7 +961,7 @@ uv.prepare_stop({prepare})                                   *uv.prepare_stop()*
 Check handles will run the given callback once per loop iteration, right after
 polling for I/O.
 
-    >
+    >lua
     local check = uv.new_check()
     check:start(function()
       print("After I/O polling")
@@ -794,7 +973,7 @@ uv.new_check()                                                  *uv.new_check()*
                 Creates and initializes a new |uv_check_t|. Returns the Lua
                 userdata wrapping it.
 
-                Returns: `uv_check_t userdata` or `fail`
+                Returns: `uv_check_t userdata`
 
 uv.check_start({check}, {callback})                           *uv.check_start()*
 
@@ -834,7 +1013,7 @@ blocking for I/O.
 WARNING: Despite the name, idle handles will get their callbacks called on
 every loop iteration, not when the loop is actually "idle".
 
-    >
+    >lua
     local idle = uv.new_idle()
     idle:start(function()
       print("Before I/O polling, no blocking")
@@ -846,7 +1025,7 @@ uv.new_idle()                                                    *uv.new_idle()*
                 Creates and initializes a new |uv_idle_t|. Returns the Lua
                 userdata wrapping it.
 
-                Returns: `uv_idle_t userdata` or `fail`
+                Returns: `uv_idle_t userdata`
 
 uv.idle_start({idle}, {callback})                              *uv.idle_start()*
 
@@ -879,7 +1058,7 @@ uv.idle_stop({check})                                           *uv.idle_stop()*
 Async handles allow the user to "wakeup" the event loop and get a callback
 called from another thread.
 
-    >
+    >lua
     local async
     async = uv.new_async(function()
       print("async operation ran")
@@ -889,15 +1068,15 @@ called from another thread.
     async:send()
 <
 
-uv.new_async([{callback}])                                      *uv.new_async()*
+uv.new_async({callback})                                        *uv.new_async()*
 
                 Parameters:
-                - `callback`: `callable` or `nil`
+                - `callback`: `callable`
                   - `...`: `threadargs` passed to/from
                     `uv.async_send(async, ...)`
 
                 Creates and initializes a new |uv_async_t|. Returns the Lua
-                userdata wrapping it. A `nil` callback is allowed.
+                userdata wrapping it.
 
                 Returns: `uv_async_t userdata` or `fail`
 
@@ -1062,12 +1241,12 @@ Unix Notes:
     will lead to unpredictable behavior and is strongly discouraged. Future
     versions of libuv may simply reject them.
 
-    >
+    >lua
     -- Create a new signal handler
     local signal = uv.new_signal()
     -- Define a handler function
-    uv.signal_start(signal, "sigint", function(signal)
-      print("got " .. signal .. ", shutting down")
+    uv.signal_start(signal, "sigint", function(signame)
+      print("got " .. signame .. ", shutting down")
       os.exit(1)
     end)
 <
@@ -1079,33 +1258,39 @@ uv.new_signal()                                                *uv.new_signal()*
 
                 Returns: `uv_signal_t userdata` or `fail`
 
-uv.signal_start({signal}, {signum}, {callback})              *uv.signal_start()*
+uv.signal_start({signal}, {signame}, {callback})             *uv.signal_start()*
 
-                > method form `signal:start(signum, callback)`
+                > method form `signal:start(signame, callback)`
 
                 Parameters:
                 - `signal`: `uv_signal_t userdata`
-                - `signum`: `integer` or `string`
+                - `signame`: `string` or `integer`
                 - `callback`: `callable`
-                  - `signum`: `string`
+                  - `signame`: `string`
 
                 Start the handle with the given callback, watching for the
                 given signal.
 
+                See |luv-constants| for supported `signame` input and output
+                values.
+
                 Returns: `0` or `fail`
                                                      *uv.signal_start_oneshot()*
-uv.signal_start_oneshot({signal}, {signum}, {callback})
+uv.signal_start_oneshot({signal}, {signame}, {callback})
 
-                > method form `signal:start_oneshot(signum, callback)`
+                > method form `signal:start_oneshot(signame, callback)`
 
                 Parameters:
                 - `signal`: `uv_signal_t userdata`
-                - `signum`: `integer` or `string`
+                - `signame`: `string` or `integer`
                 - `callback`: `callable`
-                  - `signum`: `string`
+                  - `signame`: `string`
 
                 Same functionality as |uv.signal_start()| but the signal
                 handler is reset the moment the signal is received.
+
+                See |luv-constants| for supported `signame` input and output
+                values.
 
                 Returns: `0` or `fail`
 
@@ -1164,7 +1349,7 @@ uv.spawn({path}, {options}, {on_exit})                              *uv.spawn()*
                 permissions to use the setuid or setgid specified, or not
                 having enough memory to allocate for the new process.
 
-                    >
+                    >lua
                     local stdin = uv.new_pipe()
                     local stdout = uv.new_pipe()
                     local stderr = uv.new_pipe()
@@ -1213,11 +1398,11 @@ uv.spawn({path}, {options}, {on_exit})                              *uv.spawn()*
                 The `options` table accepts the following fields:
 
                   - `options.args` - Command line arguments as a list of
-                    string. The first string should be the path to the
-                    program. On Windows, this uses CreateProcess which
-                    concatenates the arguments into a string. This can cause
-                    some strange errors. (See `options.verbatim` below for
-                    Windows.)
+                    strings. The first string should not be the path to the
+                    program, since that is already provided via `path`. On
+                    Windows, this uses CreateProcess which concatenates the
+                    arguments into a string. This can cause some strange
+                    errors (see `options.verbatim` below for Windows).
                   - `options.stdio` - Set the file descriptors that will be
                     made available to the child process. The convention is
                     that the first entries are stdin, stdout, and stderr.
@@ -1261,29 +1446,35 @@ uv.spawn({path}, {options}, {on_exit})                              *uv.spawn()*
 
                 Returns: `uv_process_t userdata`, `integer`
 
-uv.process_kill({process}, {signum})                         *uv.process_kill()*
+uv.process_kill({process}, {signame})                         *uv.process_kill()*
 
-                > method form `process:kill(signum)`
+                > method form `process:kill(signame)`
 
                 Parameters:
                 - `process`: `uv_process_t userdata`
-                - `signum`: `integer` or `string`
+                - `signame`: `string` or `integer` or `nil` (default: `sigterm`)
 
                 Sends the specified signal to the given process handle. Check
                 the documentation on |uv_signal_t| for signal support,
                 specially on Windows.
 
+                See |luv-constants| for supported `signame` input and output
+                values.
+
                 Returns: `0` or `fail`
 
-uv.kill({pid}, {signum})                                             *uv.kill()*
+uv.kill({pid}, {signame})                                             *uv.kill()*
 
                 Parameters:
                 - `pid`: `integer`
-                - `signum`: `integer` or `string`
+                - `signame`: `string` or `integer` or `nil` (default: `sigterm`)
 
                 Sends the specified signal to the given PID. Check the
                 documentation on |uv_signal_t| for signal support, specially
                 on Windows.
+
+                See |luv-constants| for supported `signame` input and output
+                values.
 
                 Returns: `0` or `fail`
 
@@ -1358,7 +1549,7 @@ uv.accept({stream}, {client_stream})                               *uv.accept()*
 
                 Returns: `0` or `fail`
 
-                    >
+                    >lua
                     server:listen(128, function (err)
                       local client = uv.new_tcp()
                       server:accept(client)
@@ -1382,7 +1573,7 @@ uv.read_start({stream}, {callback})                            *uv.read_start()*
 
                 Returns: `0` or `fail`
 
-                    >
+                    >lua
                     stream:read_start(function (err, chunk)
                       if err then
                         -- handle read error
@@ -1550,12 +1741,13 @@ TCP handles are used to represent both TCP streams and servers.
 uv.new_tcp([{flags}])                                             *uv.new_tcp()*
 
                 Parameters:
-                - `flags`: `string` or `nil`
+                - `flags`: `string` or `integer` or `nil`
 
                 Creates and initializes a new |uv_tcp_t|. Returns the Lua
-                userdata wrapping it. Flags may be a family string: `"unix"`,
-                `"inet"`, `"inet6"`, `"ipx"`, `"netlink"`, `"x25"`, `"ax25"`,
-                `"atmpvc"`, `"appletalk"`, or `"packet"`.
+                userdata wrapping it.
+
+                If set, `flags` must be a valid address family. See
+                |luv-constants| for supported address family input values.
 
                 Returns: `uv_tcp_t userdata` or `fail`
 
@@ -1656,6 +1848,8 @@ uv.tcp_getpeername({tcp})                                 *uv.tcp_getpeername()*
 
                 Get the address of the peer connected to the handle.
 
+                See |luv-constants| for supported address `family` output values.
+
                 Returns: `table` or `fail`
                 - `ip` : `string`
                 - `family` : `string`
@@ -1669,6 +1863,8 @@ uv.tcp_getsockname({tcp})                                 *uv.tcp_getsockname()*
                 - `tcp`: `uv_tcp_t userdata`
 
                 Get the current address to which the handle is bound.
+
+                See |luv-constants| for supported address `family` output values.
 
                 Returns: `table` or `fail`
                 - `ip` : `string`
@@ -1690,7 +1886,7 @@ uv.tcp_connect({tcp}, {host}, {port}, {callback})             *uv.tcp_connect()*
 
                 Returns: `uv_connect_t userdata` or `fail`
 
-                    >
+                    >lua
                     local client = uv.new_tcp()
                     client:connect("127.0.0.1", 8080, function (err)
                       -- check error and carry on.
@@ -1735,8 +1931,7 @@ uv.socketpair([{socktype}, [{protocol}, [{flags1}, [{flags2}]]]])
                 |uv.tcp_open()|, used with |uv.spawn()|, or for any other
                 purpose.
 
-                When specified as a string, `socktype` must be one of
-                `"stream"`, `"dgram"`, `"raw"`, `"rdm"`, or `"seqpacket"`.
+                See |luv-constants| for supported `socktype` input values.
 
                 When `protocol` is set to 0 or nil, it will be automatically
                 chosen based on the socket's domain and type. When `protocol`
@@ -1755,7 +1950,7 @@ uv.socketpair([{socktype}, [{protocol}, [{flags1}, [{flags2}]]]])
                 Returns: `table` or `fail`
                 - `[1, 2]` : `integer` (file descriptor)
 
-                    >
+                    >lua
                     -- Simple read/write with tcp
                     local fds = uv.socketpair(nil, nil, {nonblock=true}, {nonblock=true})
 
@@ -1780,7 +1975,7 @@ uv.socketpair([{socktype}, [{protocol}, [{flags1}, [{flags2}]]]])
 Pipe handles provide an abstraction over local domain sockets on Unix and
 named pipes on Windows.
 
-    >
+    >lua
     local pipe = uv.new_pipe(false)
 
     pipe:bind('/tmp/sock.test')
@@ -1959,7 +2154,7 @@ uv.pipe({read_flags}, {write_flags})                                 *uv.pipe()*
                 - `read` : `integer` (file descriptor)
                 - `write` : `integer` (file descriptor)
 
-                    >
+                    >lua
                     -- Simple read/write with pipe_open
                     local fds = uv.pipe({nonblock=true}, {nonblock=true})
 
@@ -1976,6 +2171,69 @@ uv.pipe({read_flags}, {write_flags})                                 *uv.pipe()*
                     end)
 <
 
+uv.pipe_bind2({pipe}, {name}, {flags})                         *uv.pipe_bind2()*
+
+                > method form `pipe:pipe_bind(name, flags)`
+
+                Parameters:
+                - `pipe`: `uv_pipe_t userdata`
+                - `name`: `string`
+                - `flags`: `integer` or `table` or `nil` (default: 0)
+
+                Flags:
+                 - If `type(flags)` is `number`, it must be `0` or
+                   `uv.constants.PIPE_NO_TRUNCATE`.
+                 - If `type(flags)` is `table`, it must be `{}` or
+                   `{ no_truncate = true|false }`.
+                 - If `type(flags)` is `nil`, it use default value `0`.
+                 - Returns `EINVAL` for unsupported flags without performing the
+                   bind.
+
+                Bind the pipe to a file path (Unix) or a name (Windows).
+
+                Supports Linux abstract namespace sockets. namelen must include
+                the leading '\0' byte but not the trailing nul byte.
+
+                Returns: `0` or `fail`
+
+                *Note*:
+                1. Paths on Unix get truncated to sizeof(sockaddr_un.sun_path)
+                   bytes, typically between 92 and 108 bytes.
+                2. New in version 1.46.0.
+
+uv.pipe_connect2(pipe, name, [flags], [callback])           *uv.pipe_connect2()*
+
+                > method form `pipe:connect2(name, [flags], [callback])`
+
+                Parameters:
+                - `pipe`: `uv_pipe_t userdata`
+                - `name`: `string`
+                - `flags`: `integer` or `table` or `nil` (default: 0)
+                - `callback`: `callable` or `nil`
+                  - `err`: `nil` or `string`
+
+                `Flags`:
+
+                - If `type(flags)` is `number`, it must be `0` or
+                  `uv.constants.PIPE_NO_TRUNCATE`.
+                - If `type(flags)` is `table`, it must be `{}` or
+                  `{ no_truncate = true|false }`.
+                - If `type(flags)` is `nil`, it use default value `0`.
+                - Returns `EINVAL` for unsupported flags without performing the
+                  bind operation.
+
+                Connect to the Unix domain socket or the named pipe.
+
+                Supports Linux abstract namespace sockets. namelen must include
+                the leading nul byte but not the trailing nul byte.
+
+                Returns: `uv_connect_t userdata` or `fail`
+
+                *Note*:
+                1. Paths on Unix get truncated to sizeof(sockaddr_un.sun_path)
+                   bytes, typically between 92 and 108 bytes.
+                2. New in version 1.46.0.
+
 ==============================================================================
 `uv_tty_t` — TTY handle                                  *luv-tty-handle* *uv_tty_t*
 
@@ -1983,7 +2241,7 @@ uv.pipe({read_flags}, {write_flags})                                 *uv.pipe()*
 
 TTY handles represent a stream for the console.
 
-    >
+    >lua
     -- Simple echo program
     local stdin = uv.new_tty(0, true)
     local stdout = uv.new_tty(1, false)
@@ -2033,17 +2291,11 @@ uv.tty_set_mode({tty}, {mode})                               *uv.tty_set_mode()*
 
                 Parameters:
                 - `tty`: `uv_tty_t userdata`
-                - `mode`: `integer`
+                - `mode`: `string` or `integer`
 
                 Set the TTY using the specified terminal mode.
 
-                Parameter `mode` is a C enum with the following values:
-
-                  - 0 - UV_TTY_MODE_NORMAL: Initial/normal terminal mode
-                  - 1 - UV_TTY_MODE_RAW: Raw input mode (On Windows,
-                    ENABLE_WINDOW_INPUT is also enabled)
-                  - 2 - UV_TTY_MODE_IO: Binary-safe I/O mode for IPC
-                    (Unix-only)
+                See |luv-constants| for supported TTY mode input values.
 
                 Returns: `0` or `fail`
 
@@ -2114,9 +2366,7 @@ uv.new_udp([{flags}])                                             *uv.new_udp()*
                 Creates and initializes a new |uv_udp_t|. Returns the Lua
                 userdata wrapping it. The actual socket is created lazily.
 
-                When specified, `family` must be one of `"unix"`, `"inet"`,
-                `"inet6"`, `"ipx"`, `"netlink"`, `"x25"`, `"ax25"`,
-                `"atmpvc"`, `"appletalk"`, or `"packet"`.
+                See |luv-constants| for supported address `family` input values.
 
                 When specified, `mmsgs` determines the number of messages able
                 to be received at one time via `recvmmsg(2)` (the allocated
@@ -2359,6 +2609,51 @@ uv.udp_try_send({udp}, {data}, {host}, {port})               *uv.udp_try_send()*
 
                 Returns: `integer` or `fail`
 
+uv.udp_try_send2({udp}, {messages}, {flags})                *uv.udp_try_send2()*
+
+                > method form `udp:try_send2(messages, flags)`
+
+                Parameters:
+                - `udp`: `uv_udp_t userdata`
+                - `messages`: `table`
+                  - `[1, 2, 3, ..., n]` : `table`
+                    - `data` : `buffer`
+                    - `addr` : `table`
+                      - `ip` : `string`
+                      - `port` : `integer`
+                - `flags`: `nil` (see below)
+                - `port`: `integer`
+
+                Like `uv.udp_try_send()`, but can send multiple datagrams.
+                Lightweight abstraction around `sendmmsg(2)`, with a
+                `sendmsg(2)` fallback loop for platforms that do not support
+                the former. The `udp` handle must be fully initialized, either
+                from a `uv.udp_bind` call, another call that will bind
+                automatically (`udp_send`, `udp_try_send`, etc), or from
+                `uv.udp_connect`. `messages` should be an array-like table,
+                where `addr` must be specified if the `udp` has not been
+                connected via `udp_connect`. Otherwise, `addr` must be `nil`.
+
+                `flags` is reserved for future extension and must currently be
+                `nil` or `0` or `{}`.
+
+                Returns the number of messages sent successfully. An error will only be returned
+                if the first datagram failed to be sent.
+
+                Returns: `integer` or `fail`
+                >lua
+                  -- If client:connect(...) was not called
+                  local addr = { ip = "127.0.0.1", port = 1234 }
+                  client:try_send2({
+                    { data = "Message 1", addr = addr },
+                    { data = "Message 2", addr = addr },
+                  })
+                  -- If client:connect(...) was called
+                  client:try_send2({
+                    { data = "Message 1" },
+                    { data = "Message 2" },
+                  })
+<
 uv.udp_recv_start({udp}, {callback})                       *uv.udp_recv_start()*
 
                 > method form `udp:recv_start(callback)`
@@ -2379,6 +2674,8 @@ uv.udp_recv_start({udp}, {callback})                       *uv.udp_recv_start()*
                 Prepare for receiving data. If the socket has not previously
                 been bound with |uv.udp_bind()| it is bound to `0.0.0.0` (the
                 "all interfaces" IPv4 address) and a random port number.
+
+                See |luv-constants| for supported address `family` output values.
 
                 Returns: `0` or `fail`
 
@@ -2488,7 +2785,7 @@ uv.fs_poll_start({fs_poll}, {path}, {interval}, {callback}) *uv.fs_poll_start()*
                 > method form `fs_poll:start(path, interval, callback)`
 
                 Parameters:
-                - `fs_event`: `uv_fs_event_t userdata`
+                - `fs_poll`: `uv_fs_poll_t userdata`
                 - `path`: `string`
                 - `interval`: `integer`
                 - `callback`: `callable`
@@ -2537,7 +2834,7 @@ FS call.
 Synchronous and asynchronous versions of `readFile` (with naive error
 handling) are implemented below as an example:
 
-    >
+    >lua
     local function readFileSync(path)
       local fd = assert(uv.fs_open(path, "r", 438))
       local stat = assert(uv.fs_fstat(fd))
@@ -2550,7 +2847,7 @@ handling) are implemented below as an example:
     print("synchronous read", data)
 <
 
-    >
+    >lua
     local function readFile(path, callback)
       uv.fs_open(path, "r", 438, function(err, fd)
         assert(not err, err)
@@ -2592,7 +2889,8 @@ uv.fs_open({path}, {flags}, {mode} [, {callback}])                *uv.fs_open()*
                 Parameters:
                 - `path`: `string`
                 - `flags`: `string` or `integer`
-                - `mode`: `integer`
+                - `mode`: `integer` (octal `chmod(1)` mode, e.g.
+                  `tonumber('644', 8)`)
                 - `callback`: `callable` (async version) or `nil` (sync
                   version)
                   - `err`: `nil` or `string`
@@ -2626,7 +2924,7 @@ uv.fs_read({fd}, {size} [, {offset} [, {callback}]])              *uv.fs_read()*
                 indicates EOF.
 
                 If `offset` is nil or omitted, it will default to `-1`, which
-                indicates 'use and update the current file offset.'
+                indicates "use and update the current file offset."
 
                 Note: When `offset` is >= 0, the current file offset will not
                 be updated by the read.
@@ -2665,7 +2963,7 @@ uv.fs_write({fd}, {data} [, {offset} [, {callback}]])            *uv.fs_write()*
                 written.
 
                 If `offset` is nil or omitted, it will default to `-1`, which
-                indicates 'use and update the current file offset.'
+                indicates "use and update the current file offset."
 
                 Note: When `offset` is >= 0, the current file offset will not
                 be updated by the write.
@@ -2678,7 +2976,8 @@ uv.fs_mkdir({path}, {mode} [, {callback}])                       *uv.fs_mkdir()*
 
                 Parameters:
                 - `path`: `string`
-                - `mode`: `integer`
+                - `mode`: `integer` (octal representation of `chmod(1)` mode,
+                  e.g. `tonumber('755', 8)`)
                 - `callback`: `callable` (async version) or `nil` (sync
                   version)
                   - `err`: `nil` or `string`
@@ -2829,7 +3128,7 @@ uv.fs_fstat({fd} [, {callback}])                                 *uv.fs_fstat()*
 uv.fs_lstat({path} [, {callback}])                               *uv.fs_lstat()*
 
                 Parameters:
-                - `fd`: `integer`
+                - `path`: `string`
                 - `callback`: `callable` (async version) or `nil` (sync
                   version)
                   - `err`: `nil` or `string`
@@ -2927,7 +3226,9 @@ uv.fs_access({path}, {mode} [, {callback}])                     *uv.fs_access()*
 
                 Parameters:
                 - `path`: `string`
-                - `mode`: `integer`
+                - `mode`: `integer` `string` (a combination of the `'r'`,
+                  `'w'` and `'x'` characters denoting the symbolic mode as per
+                  `chmod(1)`)
                 - `callback`: `callable` (async version) or `nil` (sync
                   version)
                   - `err`: `nil` or `string`
@@ -2946,7 +3247,8 @@ uv.fs_chmod({path}, {mode} [, {callback}])                       *uv.fs_chmod()*
 
                 Parameters:
                 - `path`: `string`
-                - `mode`: `integer`
+                - `mode`: `integer` (octal representation of `chmod(1)` mode,
+                  e.g. `tonumber('644', 8)`)
                 - `callback`: `callable` (async version) or `nil` (sync
                   version)
                   - `err`: `nil` or `string`
@@ -3253,7 +3555,7 @@ Libuv provides a threadpool which can be used to run user code and get
 notified in the loop thread. This threadpool is internally used to run all
 file system operations, as well as `getaddrinfo` and `getnameinfo` requests.
 
-    >
+    >lua
     local function work_callback(a, b)
       return a + b
     end
@@ -3272,14 +3574,17 @@ file system operations, as well as `getaddrinfo` and `getnameinfo` requests.
 uv.new_work({work_callback}, {after_work_callback})              *uv.new_work()*
 
                 Parameters:
-                - `work_callback`: `function`
+                - `work_callback`: `function` or `string`
                   - `...`: `threadargs` passed to/from
                     `uv.queue_work(work_ctx, ...)`
                 - `after_work_callback`: `function`
                   - `...`: `threadargs` returned from `work_callback`
 
                 Creates and initializes a new `luv_work_ctx_t` (not
-                `uv_work_t`). Returns the Lua userdata wrapping it.
+                `uv_work_t`).
+                `work_callback` is a Lua function or a string containing Lua
+                code or bytecode dumped from a function. Returns the Lua
+                userdata wrapping it.
 
                 Returns: `luv_work_ctx_t userdata`
 
@@ -3326,14 +3631,17 @@ uv.getaddrinfo({host}, {service} [, {hints} [, {callback}]])  *uv.getaddrinfo()*
                 Equivalent to `getaddrinfo(3)`. Either `node` or `service` may
                 be `nil` but not both.
 
-                Valid hint strings for the keys that take a string:
-                - `family`: `"unix"`, `"inet"`, `"inet6"`, `"ipx"`,
-                  `"netlink"`, `"x25"`, `"ax25"`, `"atmpvc"`, `"appletalk"`,
-                  or `"packet"`
-                - `socktype`: `"stream"`, `"dgram"`, `"raw"`, `"rdm"`, or
-                  `"seqpacket"`
-                - `protocol`: will be looked up using the `getprotobyname(3)`
-                  function (examples: `"ip"`, `"icmp"`, `"tcp"`, `"udp"`, etc)
+                See |luv-constants| for supported address `family` input and
+                output values.
+
+                See |luv-constants| for supported `socktype` input and
+                output values.
+
+                When `protocol` is set to `0` or `nil`, it will be
+                automatically chosen based on the socket's domain and type.
+                When `protocol` is specified as a string, it will be looked up
+                using the `getprotobyname(3)` function. Examples: `"ip"`,
+                `"icmp"`, `"tcp"`, `"udp"`, etc.
 
                 Returns (sync version): `table` or `fail`
                 - `[1, 2, 3, ..., n]` : `table`
@@ -3361,9 +3669,7 @@ uv.getnameinfo({address} [, {callback}])                      *uv.getnameinfo()*
 
                 Equivalent to `getnameinfo(3)`.
 
-                When specified, `family` must be one of `"unix"`, `"inet"`,
-                `"inet6"`, `"ipx"`, `"netlink"`, `"x25"`, `"ax25"`,
-                `"atmpvc"`, `"appletalk"`, or `"packet"`.
+                See |luv-constants| for supported address `family` input values.
 
                 Returns (sync version): `string, string` or `fail`
 
@@ -3372,7 +3678,7 @@ uv.getnameinfo({address} [, {callback}])                      *uv.getnameinfo()*
 ==============================================================================
 THREADING AND SYNCHRONIZATION UTILITIES *luv-threading-and-synchronization-utilities*
 
-Libuv provides cross-platform implementations for multiple threading an
+Libuv provides cross-platform implementations for multiple threading and
 synchronization primitives. The API largely follows the pthreads API.
 
 uv.new_thread([{options}, ] {entry}, {...})                    *uv.new_thread()*
@@ -3380,18 +3686,21 @@ uv.new_thread([{options}, ] {entry}, {...})                    *uv.new_thread()*
                 Parameters:
                 - `options`: `table` or `nil`
                   - `stack_size`: `integer` or `nil`
-                - `entry`: `function`
+                - `entry`: `function` or `string`
                 - `...`: `threadargs` passed to `entry`
 
                 Creates and initializes a `luv_thread_t` (not `uv_thread_t`).
                 Returns the Lua userdata wrapping it and asynchronously
-                executes `entry`, which can be either a Lua function or a Lua
-                function dumped to a string. Additional arguments `...` are
-                passed to the `entry` function and an optional `options` table
-                may be provided. Currently accepted `option` fields are
-                `stack_size`.
+                executes `entry`, which can be either a Lua function or a
+                string containing Lua code or bytecode dumped from a function.
+                Additional arguments `...` are passed to the `entry` function
+                and an optional `options` table may be provided. Currently
+                accepted `option` fields are `stack_size`.
 
                 Returns: `luv_thread_t userdata` or `fail`
+
+                Note: unsafe, please make sure that the thread's end of life
+                is before Lua state is closed.
 
 uv.thread_equal({thread}, {other_thread})                    *uv.thread_equal()*
 
@@ -3405,6 +3714,109 @@ uv.thread_equal({thread}, {other_thread})                    *uv.thread_equal()*
                 This function is equivalent to the `__eq` metamethod.
 
                 Returns: `boolean`
+                                                     *uv.thread_setaffinity()*
+uv.thread_setaffinity({thread}, {affinity} [, {get_old_affinity}])
+
+                > method form `thread:setaffinity(affinity, [get_old_affinity])`
+
+                Parameters:
+                - `thread`: `luv_thread_t userdata`
+                - `affinity`: `table`
+                  - `[1, 2, 3, ..., n]` : `boolean`
+                - `get_old_affinity`: `boolean`
+
+                Sets the specified thread's affinity setting.
+
+                `affinity` must be a table where each of the keys are a CPU
+                number and the values are booleans that represent whether the
+                `thread` should be eligible to run on that CPU. If the length
+                of the `affinity` table is not greater than or equal to
+                |uv.cpumask_size()|, any CPU numbers missing from the table
+                will have their affinity set to `false`. If setting the
+                affinity of more than |uv.cpumask_size()| CPUs is desired,
+                `affinity` must be an array-like table with no gaps, since
+                `#affinity` will be used as the `cpumask_size` if it is
+                greater than |uv.cpumask_size()|.
+
+                If `get_old_affinity` is `true`, the previous affinity
+                settings for the `thread` will be returned. Otherwise, `true`
+                is returned after a successful call.
+
+                Note: Thread affinity setting is not atomic on Windows.
+                Unsupported on macOS.
+
+                Returns: `table` or `boolean` or `fail`
+                - `[1, 2, 3, ..., n]` : `boolean`
+
+
+uv.thread_getaffinity({thread} [, {mask_size}])        *uv.thread_getaffinity()*
+
+                > method form `thread:getaffinity([mask_size])`
+
+                Parameters:
+                - `thread`: `luv_thread_t userdata`
+                - `mask_size`: `integer`
+
+                Gets the specified thread's affinity setting.
+
+                If `mask_size` is provided, it must be greater than or equal
+                to `uv.cpumask_size()`. If the `mask_size` parameter is
+                omitted, then the return of `uv.cpumask_size()` will be used.
+                Returns an array-like table where each of the keys correspond
+                to a CPU number and the values are booleans that represent
+                whether the `thread` is eligible to run on that CPU.
+
+                Note: Thread affinity getting is not atomic on Windows.
+                Unsupported on macOS.
+
+                Returns: `table` or `fail`
+                - `[1, 2, 3, ..., n]` : `boolean`
+
+uv.thread_getcpu()                                          *uv.thread_getcpu()*
+
+                Gets the CPU number on which the calling thread is running.
+
+                Note: The first CPU will be returned as the number 1, not 0.
+                This allows for the number to correspond with the table keys
+                used in `uv.thread_getaffinity` and `uv.thread_setaffinity`.
+
+                Returns: `integer` or `fail`
+
+uv.thread_setpriority({thread}, {priority})            *uv.thread.setpriority()*
+
+                > method form `thread:setpriority(priority)`
+
+                Parameters:
+                - `thread`: `luv_thread_t userdata`
+                - `priority`: `number`
+
+                Sets the specified thread's scheduling priority setting. It
+                requires elevated privilege to set specific priorities on some
+                platforms. The priority can be set to the following constants:
+                - `uv.constants.THREAD_PRIORITY_HIGHEST`
+                - `uv.constants.THREAD_PRIORITY_ABOVE_NORMAL`
+                - `uv.constants.THREAD_PRIORITY_NORMAL`
+                - `uv.constants.THREAD_PRIORITY_BELOW_NORMAL`
+                - `uv.constants.THREAD_PRIORITY_LOWEST`
+
+                Returns: `boolean` or `fail`
+
+uv.thread_getpriority({thread})                        *uv.thread.getpriority()*
+
+                > method form `thread:getpriority()`
+
+                Parameters:
+                - `thread`: `luv_thread_t userdata`
+
+                Gets the thread's priority setting.
+
+                Retrieves the scheduling priority of the specified thread. The
+                returned priority value is platform dependent.
+
+                For Linux, when schedule policy is SCHED_OTHER (default),
+                priority is 0.
+
+                Returns: `number` or `fail`
 
 uv.thread_self()                                              *uv.thread_self()*
 
@@ -3422,6 +3834,43 @@ uv.thread_join({thread})                                      *uv.thread_join()*
                 Waits for the `thread` to finish executing its entry function.
 
                 Returns: `boolean` or `fail`
+
+uv.thread_detach({thread})                                  *uv.thread_detach()*
+
+                > method form `thread:detach()`
+
+                Parameters:
+                - `thread`: `luv_thread_t userdata`
+
+                Detaches a thread. Detached threads automatically release
+                their resources upon termination, eliminating the need for the
+                application to call `uv.thread_join`.
+
+                Returns: `boolean` or `fail`
+
+uv.thread_setname({name})                                  *uv.thread_setname()*
+
+                Parameters:
+                - `name`: `string`
+
+                Sets the name of the current thread. Different platforms
+                define different limits on the max number of characters a
+                thread name can be: Linux, IBM i (16), macOS (64), Windows
+                (32767), and NetBSD (32), etc. The name will be truncated if
+                `name` is larger than the limit of the platform.
+
+                Returns: `0` or `fail`
+
+uv.thread_getname({thread})                                *uv.thread_getname()*
+
+                > method form `thread:getname()`
+
+                Parameters:
+                - `thread`: `luv_thread_t userdata`
+
+                Gets the name of the thread specified by `thread`.
+
+                Returns: `string` or `fail`
 
 uv.sleep({msec})                                                    *uv.sleep()*
 
@@ -3494,6 +3943,16 @@ uv.get_constrained_memory()                        *uv.get_constrained_memory()*
 
                 Returns: `number`
 
+uv.get_available_memory()                            *uv.get_available_memory()*
+
+                Gets the amount of free memory that is still available to the
+                process (in bytes). This differs from `uv.get_free_memory()`
+                in that it takes into account any limits imposed by the OS. If
+                there is no such constraint, or the constraint is unknown, the
+                amount returned will be identical to `uv.get_free_memory()`.
+
+                Returns: `number`
+
 uv.resident_set_memory()                              *uv.resident_set_memory()*
 
                 Returns the resident set size (RSS) for the current process.
@@ -3503,6 +3962,36 @@ uv.resident_set_memory()                              *uv.resident_set_memory()*
 uv.getrusage()                                                  *uv.getrusage()*
 
                 Returns the resource usage.
+
+                Returns: `table` or `fail`
+                - `utime` : `table` (user CPU time used)
+                  - `sec` : `integer`
+                  - `usec` : `integer`
+                - `stime` : `table` (system CPU time used)
+                  - `sec` : `integer`
+                  - `usec` : `integer`
+                - `maxrss` : `integer` (maximum resident set size)
+                - `ixrss` : `integer` (integral shared memory size)
+                - `idrss` : `integer` (integral unshared data size)
+                - `isrss` : `integer` (integral unshared stack size)
+                - `minflt` : `integer` (page reclaims (soft page faults))
+                - `majflt` : `integer` (page faults (hard page faults))
+                - `nswap` : `integer` (swaps)
+                - `inblock` : `integer` (block input operations)
+                - `oublock` : `integer` (block output operations)
+                - `msgsnd` : `integer` (IPC messages sent)
+                - `msgrcv` : `integer` (IPC messages received)
+                - `nsignals` : `integer` (signals received)
+                - `nvcsw` : `integer` (voluntary context switches)
+                - `nivcsw` : `integer` (involuntary context switches)
+
+uv.getrusage_thread()                                    *uv.getrusage_thread()*
+                Gets the resource usage measures for the calling thread.
+
+                Note: Not supported on all platforms. May return `ENOTSUP`.
+
+                On macOS and Windows not all fields are set (the unsupported
+                fields are filled with zeroes).
 
                 Returns: `table` or `fail`
                 - `utime` : `table` (user CPU time used)
@@ -3557,6 +4046,14 @@ uv.cpu_info()                                                    *uv.cpu_info()*
                     - `sys` : `number`
                     - `idle` : `number`
                     - `irq` : `number`
+
+uv.cpumask_size()                                           *uv.cpumask_size()*
+
+                Returns the maximum size of the mask used for process/thread
+                affinities, or `ENOTSUP` if affinities are not supported on
+                the current platform.
+
+                Returns: `integer` or `fail`
 
 uv.getpid()                                                        *uv.getpid()*
 
@@ -3614,6 +4111,25 @@ uv.hrtime()                                                        *uv.hrtime()*
 
                 Returns: `number`
 
+uv.clock_gettime({clock_id})                                *uv.clock_gettime()*
+
+                Parameters:
+                - `clock_id`: `string`
+
+                Obtain the current system time from a high-resolution
+                real-time or monotonic clock source. `clock_id` can be the
+                string `"monotonic"` or `"realtime"`.
+
+                The real-time clock counts from the UNIX epoch (1970-01-01)
+                and is subject to time adjustments; it can jump back in time.
+
+                The monotonic clock counts from an arbitrary point in the past
+                and never jumps back in time.
+
+                Returns: `table` or `fail`
+                - `sec`: `integer`
+                - `nsec`: `integer`
+
 uv.uptime()                                                        *uv.uptime()*
 
                 Returns the current system uptime in seconds.
@@ -3670,6 +4186,8 @@ uv.interface_addresses()                              *uv.interface_addresses()*
                 interface while each associated value is an array of address
                 information where fields are `ip`, `family`, `netmask`,
                 `internal`, and `mac`.
+
+                See |luv-constants| for supported address `family` output values.
 
                 Returns: `table`
                 - `[name(s)]` : `table`
@@ -3752,7 +4270,12 @@ uv.os_setenv({name}, {value})                                   *uv.os_setenv()*
 
                 WARNING: This function is not thread safe.
 
-uv.os_unsetenv()                                              *uv.os_unsetenv()*
+uv.os_unsetenv({name})                                        *uv.os_unsetenv()*
+
+                Parameters:
+                - `name`: `string`
+
+                Unsets the environmental variable specified by `name`.
 
                 Returns: `boolean` or `fail`
 
@@ -3885,14 +4408,89 @@ uv.metrics_idle_time()                                  *uv.metrics_idle_time()*
 
                 Returns: `number`
 
+uv.metrics_info()                                            *uv.metrics_info()*
+
+                Get the metrics table from current set of event loop metrics.
+                It is recommended to retrieve these metrics in a `prepare`
+                callback (see |uv.new_prepare()|, |uv.prepare_start()|) in order
+                to make sure there are no inconsistencies with the metrics
+                counters.
+
+                Returns: `table`
+
+                - `loop_count` : `integer`
+                - `events` : `integer`
+                - `events_waiting` : `integer`
+
+==============================================================================
+STRING MANIPULATION FUNCTIONS                          *luv-string-manipulation*
+
+These string utilities are needed internally for dealing with Windows, and are
+exported to allow clients to work uniformly with this data when the libuv API
+is not complete.
+
+Notes:
+1. New in luv version 1.49.0.
+2. See the WTF-8 spec (https://simonsapin.github.io/wtf-8/) for information
+   about WTF-8.
+3. Luv uses Lua-style strings, which means that all inputs and return values
+   (UTF-8 or UTF-16 strings) do not include a NUL terminator.
+
+uv.utf16_length_as_wtf8({utf16})                     *uv.utf16_length_as_wtf8()*
+
+                Get the length (in bytes) of a UTF-16 (or UCS-2) string
+                `utf16` value after converting it to WTF-8. The endianness of
+                the UTF-16 (or UCS-2) string is assumed to be the same as the
+                native endianness of the platform.
+
+                Parameters:
+                - `utf16`: `string`
+
+                Returns: `integer`
+
+uv.utf16_to_wtf8({utf16})                                   *uv.utf16_to_wtf8()*
+
+                Convert UTF-16 (or UCS-2) string `utf16` to UTF-8 string. The
+                endianness of the UTF-16 (or UCS-2) string is assumed to be
+                the same as the native endianness of the platform.
+
+                Parameters:
+                - `utf16`: `string`
+
+                Returns: `string`
+
+uv.wtf8_length_as_utf16({wtf16})                     *uv.wtf8_length_as_utf16()*
+
+                Get the length (in UTF-16 code units) of a WTF-8 `wtf8` value
+                after converting it to UTF-16 (or UCS-2).
+
+                Note: The number of bytes needed for a UTF-16 (or UCS-2)
+                string is `<number of code units> * 2`.
+
+                Parameters:
+                - `wtf8`: `string`
+
+                Returns: `integer`
+
+uv.wtf8_to_utf16({wtf16})                                   *uv.wtf8_to_utf16()*
+
+                Convert WTF-8 string in `wtf8` to UTF-16 (or UCS-2) string.
+                The endianness of the UTF-16 (or UCS-2) string is assumed to
+                be the same as the native endianness of the platform.
+
+                Parameters:
+                - `wtf8`: `string`
+
+                Returns: `string`
+
 ==============================================================================
 CREDITS                                                            *luv-credits*
 
-This document is a reformatted version of the LUV documentation, based on
-commit c51e705 (5 May 2022) of the luv repository
-https://github.com/luvit/luv/commit/c51e7052ec4f0a25058f70c1b4ee99dd36180e59.
+This document is a reformatted version of the LUV documentation, up-to-date
+with commit dcd1a1c (23 Aug 2023) of the luv repository
+https://github.com/luvit/luv/commit/dcd1a1cad5b05634a7691402d6ca2f214fb4ae76.
 
-Included from https://github.com/nanotee/luv-vimdocs with kind permission.
+Based on https://github.com/nanotee/luv-vimdocs with kind permission.
 
 
-vim:tw=78:ts=8:ft=help:norl:
+vim:tw=78:ts=8:sw=2:et:ft=help:norl:

@@ -1,35 +1,37 @@
-local helpers = require('test.functional.helpers')(after_each)
+local t = require('test.testutil')
+local n = require('test.functional.testnvim')()
 local Screen = require('test.functional.ui.screen')
-local clear = helpers.clear
-local command = helpers.command
-local eq = helpers.eq
-local eval = helpers.eval
-local feed = helpers.feed
-local funcs = helpers.funcs
-local poke_eventloop = helpers.poke_eventloop
-local exec = helpers.exec
+
+local clear = n.clear
+local command = n.command
+local eq = t.eq
+local eval = n.eval
+local feed = n.feed
+local fn = n.fn
+local poke_eventloop = n.poke_eventloop
+local exec = n.exec
 
 describe('search cmdline', function()
   local screen
 
   before_each(function()
     clear()
-    command('set nohlsearch')
+    command('set nohlsearch inccommand=')
     screen = Screen.new(20, 3)
-    screen:attach()
-    screen:set_default_attr_ids({
-      inc = {reverse = true},
-      err = { foreground = Screen.colors.Grey100, background = Screen.colors.Red },
-      more = { bold = true, foreground = Screen.colors.SeaGreen4 },
-      tilde = { bold = true, foreground = Screen.colors.Blue1 },
-      hl = { background = Screen.colors.Yellow },
-    })
   end)
 
   local function tenlines()
-    funcs.setline(1, {
-      '  1', '  2 these', '  3 the', '  4 their', '  5 there',
-      '  6 their', '  7 the', '  8 them', '  9 these', ' 10 foobar'
+    fn.setline(1, {
+      '  1',
+      '  2 these',
+      '  3 the',
+      '  4 their',
+      '  5 there',
+      '  6 their',
+      '  7 the',
+      '  8 them',
+      '  9 these',
+      ' 10 foobar',
     })
     command('1')
   end
@@ -47,84 +49,87 @@ describe('search cmdline', function()
   describe('can traverse matches', function()
     before_each(tenlines)
     local function forwarditer(wrapscan)
-      command('set incsearch '..wrapscan)
+      command('set incsearch ' .. wrapscan)
       feed('/the')
       screen:expect([[
           1                 |
-          2 {inc:the}se           |
+          2 {2:the}se           |
         /the^                |
       ]])
       feed('<C-G>')
       screen:expect([[
           2 these           |
-          3 {inc:the}             |
+          3 {2:the}             |
         /the^                |
       ]])
-      eq({0, 0, 0, 0}, funcs.getpos('"'))
+      eq({ 0, 0, 0, 0 }, fn.getpos('"'))
       feed('<C-G>')
       screen:expect([[
           3 the             |
-          4 {inc:the}ir           |
+          4 {2:the}ir           |
         /the^                |
       ]])
       feed('<C-G>')
       screen:expect([[
           4 their           |
-          5 {inc:the}re           |
+          5 {2:the}re           |
         /the^                |
       ]])
       feed('<C-G>')
       screen:expect([[
           5 there           |
-          6 {inc:the}ir           |
+          6 {2:the}ir           |
         /the^                |
       ]])
       feed('<C-G>')
       screen:expect([[
           6 their           |
-          7 {inc:the}             |
+          7 {2:the}             |
         /the^                |
       ]])
       feed('<C-G>')
       screen:expect([[
           7 the             |
-          8 {inc:the}m            |
+          8 {2:the}m            |
         /the^                |
       ]])
       feed('<C-G>')
       screen:expect([[
           8 them            |
-          9 {inc:the}se           |
+          9 {2:the}se           |
         /the^                |
       ]])
       screen.bell = false
       feed('<C-G>')
       if wrapscan == 'wrapscan' then
         screen:expect([[
-            2 {inc:the}se           |
+            2 {2:the}se           |
             3 the             |
           /the^                |
         ]])
       else
-        screen:expect{grid=[[
+        screen:expect {
+          grid = [[
             8 them            |
-            9 {inc:the}se           |
+            9 {2:the}se           |
           /the^                |
-        ]], condition=function()
-          eq(true, screen.bell)
-        end}
+        ]],
+          condition = function()
+            eq(true, screen.bell)
+          end,
+        }
         feed('<CR>')
-        eq({0, 0, 0, 0}, funcs.getpos('"'))
+        eq({ 0, 0, 0, 0 }, fn.getpos('"'))
       end
     end
 
     local function backiter(wrapscan)
-      command('set incsearch '..wrapscan)
+      command('set incsearch ' .. wrapscan)
       command('$')
 
       feed('?the')
       screen:expect([[
-          9 {inc:the}se           |
+          9 {2:the}se           |
          10 foobar          |
         ?the^                |
       ]])
@@ -132,7 +137,7 @@ describe('search cmdline', function()
       if wrapscan == 'wrapscan' then
         feed('<C-G>')
         screen:expect([[
-            2 {inc:the}se           |
+            2 {2:the}se           |
             3 the             |
           ?the^                |
         ]])
@@ -144,13 +149,16 @@ describe('search cmdline', function()
         ]])
       else
         feed('<C-G>')
-        screen:expect{grid=[[
-            9 {inc:the}se           |
+        screen:expect {
+          grid = [[
+            9 {2:the}se           |
            10 foobar          |
           ?the^                |
-        ]], condition=function()
-          eq(true, screen.bell)
-        end}
+        ]],
+          condition = function()
+            eq(true, screen.bell)
+          end,
+        }
         feed('<CR>')
         screen:expect([[
             9 ^these           |
@@ -161,13 +169,13 @@ describe('search cmdline', function()
       command('$')
       feed('?the')
       screen:expect([[
-          9 {inc:the}se           |
+          9 {2:the}se           |
          10 foobar          |
         ?the^                |
       ]])
       feed('<C-T>')
       screen:expect([[
-          8 {inc:the}m            |
+          8 {2:the}m            |
           9 these           |
         ?the^                |
       ]])
@@ -180,7 +188,7 @@ describe('search cmdline', function()
         end
       end
       screen:expect([[
-          2 {inc:the}se           |
+          2 {2:the}se           |
           3 the             |
         ?the^                |
       ]])
@@ -188,18 +196,21 @@ describe('search cmdline', function()
       feed('<C-T>')
       if wrapscan == 'wrapscan' then
         screen:expect([[
-            9 {inc:the}se           |
+            9 {2:the}se           |
            10 foobar          |
           ?the^                |
         ]])
       else
-        screen:expect{grid=[[
-            2 {inc:the}se           |
+        screen:expect {
+          grid = [[
+            2 {2:the}se           |
             3 the             |
           ?the^                |
-        ]], condition=function()
-          eq(true, screen.bell)
-        end}
+        ]],
+          condition = function()
+            eq(true, screen.bell)
+          end,
+        }
       end
     end
 
@@ -227,24 +238,24 @@ describe('search cmdline', function()
     feed('/the')
     screen:expect([[
         1                 |
-        2 {inc:the}se           |
+        2 {2:the}se           |
       /the^                |
     ]])
     feed('<C-L>')
     screen:expect([[
         1                 |
-        2 {inc:thes}e           |
+        2 {2:thes}e           |
       /thes^               |
     ]])
     feed('<C-G>')
     screen:expect([[
-        9 {inc:thes}e           |
+        9 {2:thes}e           |
        10 foobar          |
       /thes^               |
     ]])
     feed('<C-G>')
     screen:expect([[
-        2 {inc:thes}e           |
+        2 {2:thes}e           |
         3 the             |
       /thes^               |
     ]])
@@ -260,18 +271,18 @@ describe('search cmdline', function()
     feed('/the')
     screen:expect([[
         1                 |
-        2 {inc:the}se           |
+        2 {2:the}se           |
       /the^                |
     ]])
     feed('<C-L>')
     screen:expect([[
         1                 |
-        2 {inc:thes}e           |
+        2 {2:thes}e           |
       /thes^               |
     ]])
     feed('<C-G>')
     screen:expect([[
-        9 {inc:thes}e           |
+        9 {2:thes}e           |
        10 foobar          |
       /thes^               |
     ]])
@@ -290,42 +301,42 @@ describe('search cmdline', function()
     -- First match
     feed('/thei')
     screen:expect([[
-        4 {inc:thei}r           |
-        5 there           |
+        3 the             |
+        4 {2:thei}r           |
       /thei^               |
     ]])
     -- Match from initial cursor position when modifying search
     feed('<BS>')
     screen:expect([[
         1                 |
-        2 {inc:the}se           |
+        2 {2:the}se           |
       /the^                |
     ]])
     -- New text advances to next match
     feed('s')
     screen:expect([[
         1                 |
-        2 {inc:thes}e           |
+        2 {2:thes}e           |
       /thes^               |
     ]])
     -- Stay on this match when deleting a character
     feed('<BS>')
     screen:expect([[
         1                 |
-        2 {inc:the}se           |
+        2 {2:the}se           |
       /the^                |
     ]])
     -- Advance to previous match
     feed('<C-T>')
     screen:expect([[
-        9 {inc:the}se           |
+        9 {2:the}se           |
        10 foobar          |
       /the^                |
     ]])
     -- Extend search to include next character
     feed('<C-L>')
     screen:expect([[
-        9 {inc:thes}e           |
+        9 {2:thes}e           |
        10 foobar          |
       /thes^               |
     ]])
@@ -339,19 +350,19 @@ describe('search cmdline', function()
     feed('the')
     screen:expect([[
         1                 |
-        2 {inc:the}se           |
+        2 {2:the}se           |
       /the^                |
     ]])
     feed('\\>')
     screen:expect([[
         2 these           |
-        3 {inc:the}             |
+        3 {2:the}             |
       /the\>^              |
     ]])
   end)
 
   it('can traverse matches in the same line with <C-G>/<C-T>', function()
-    funcs.setline(1, { '  1', '  2 these', '  3 the theother' })
+    fn.setline(1, { '  1', '  2 these', '  3 the theother' })
     command('1')
     command('set incsearch')
 
@@ -359,7 +370,7 @@ describe('search cmdline', function()
     feed('/the')
     screen:expect([[
         1                 |
-        2 {inc:the}se           |
+        2 {2:the}se           |
       /the^                |
     ]])
 
@@ -367,7 +378,7 @@ describe('search cmdline', function()
     feed('<C-G>')
     screen:expect([[
         2 these           |
-        3 {inc:the} theother    |
+        3 {2:the} theother    |
       /the^                |
     ]])
 
@@ -375,13 +386,13 @@ describe('search cmdline', function()
     feed('<C-G>')
     screen:expect([[
         2 these           |
-        3 the {inc:the}other    |
+        3 the {2:the}other    |
       /the^                |
     ]])
     feed('<C-G>')
     screen:expect([[
         2 these           |
-        3 the theo{inc:the}r    |
+        3 the theo{2:the}r    |
       /the^                |
     ]])
 
@@ -389,20 +400,20 @@ describe('search cmdline', function()
     feed('<C-T>')
     screen:expect([[
         2 these           |
-        3 the {inc:the}other    |
+        3 the {2:the}other    |
       /the^                |
     ]])
     feed('<C-T>')
     screen:expect([[
         2 these           |
-        3 {inc:the} theother    |
+        3 {2:the} theother    |
       /the^                |
     ]])
 
     -- Previous match, different line
     feed('<C-T>')
     screen:expect([[
-        2 {inc:the}se           |
+        2 {2:the}se           |
         3 the theother    |
       /the^                |
     ]])
@@ -418,7 +429,7 @@ describe('search cmdline', function()
         7 the             |
         8 them            |
         9 these           |
-       10 {inc:foo}bar          |
+       10 {2:foo}bar          |
       /foo^                |
     ]])
     feed('<BS>')
@@ -427,7 +438,7 @@ describe('search cmdline', function()
         7 the             |
         8 them            |
         9 these           |
-       10 {inc:fo}obar          |
+       10 {2:fo}obar          |
       /fo^                 |
     ]])
     feed('<CR>')
@@ -439,9 +450,16 @@ describe('search cmdline', function()
        10 ^foobar          |
       /fo                 |
     ]])
-    eq({lnum = 10, leftcol = 0, col = 4, topfill = 0, topline = 6,
-        coladd = 0, skipcol = 0, curswant = 4},
-       funcs.winsaveview())
+    eq({
+      lnum = 10,
+      leftcol = 0,
+      col = 4,
+      topfill = 0,
+      topline = 6,
+      coladd = 0,
+      skipcol = 0,
+      curswant = 4,
+    }, fn.winsaveview())
   end)
 
   it('restores original view after failed search', function()
@@ -451,7 +469,7 @@ describe('search cmdline', function()
     feed('/foo')
     screen:expect([[
         9 these                               |
-       10 {inc:foo}bar                              |
+       10 {2:foo}bar                              |
       /foo^                                    |
     ]])
     feed('<C-W>')
@@ -463,20 +481,27 @@ describe('search cmdline', function()
     feed('<CR>')
     screen:expect([[
       /                                       |
-      {err:E35: No previous regular expression}     |
-      {more:Press ENTER or type command to continue}^ |
+      {9:E35: No previous regular expression}     |
+      {6:Press ENTER or type command to continue}^ |
     ]])
     feed('<CR>')
-    eq({lnum = 1, leftcol = 0, col = 0, topfill = 0, topline = 1,
-        coladd = 0, skipcol = 0, curswant = 0},
-       funcs.winsaveview())
+    eq({
+      lnum = 1,
+      leftcol = 0,
+      col = 0,
+      topfill = 0,
+      topline = 1,
+      coladd = 0,
+      skipcol = 0,
+      curswant = 0,
+    }, fn.winsaveview())
   end)
 
+  -- oldtest: Test_search_cmdline4().
   it("CTRL-G with 'incsearch' and ? goes in the right direction", function()
-    -- oldtest: Test_search_cmdline4().
     screen:try_resize(40, 4)
     command('enew!')
-    funcs.setline(1, {'  1 the first', '  2 the second', '  3 the third'})
+    fn.setline(1, { '  1 the first', '  2 the second', '  3 the third' })
     command('set laststatus=0 shortmess+=s')
     command('set incsearch')
     command('$')
@@ -573,51 +598,51 @@ describe('search cmdline', function()
     ]])
   end)
 
+  -- oldtest: Test_incsearch_sort_dump().
   it('incsearch works with :sort', function()
-    -- oldtest: Test_incsearch_sort_dump().
     screen:try_resize(20, 4)
     command('set incsearch hlsearch scrolloff=0')
-    funcs.setline(1, {'another one 2', 'that one 3', 'the one 1'})
+    fn.setline(1, { 'another one 2', 'that one 3', 'the one 1' })
 
     feed(':sort ni u /on')
     screen:expect([[
-      another {inc:on}e 2       |
-      that {hl:on}e 3          |
-      the {hl:on}e 1           |
+      another {2:on}e 2       |
+      that {10:on}e 3          |
+      the {10:on}e 1           |
       :sort ni u /on^      |
     ]])
     feed('<esc>')
   end)
 
+  -- oldtest: Test_incsearch_vimgrep_dump().
   it('incsearch works with :vimgrep family', function()
-    -- oldtest: Test_incsearch_vimgrep_dump().
     screen:try_resize(30, 4)
     command('set incsearch hlsearch scrolloff=0')
-    funcs.setline(1, {'another one 2', 'that one 3', 'the one 1'})
+    fn.setline(1, { 'another one 2', 'that one 3', 'the one 1' })
 
     feed(':vimgrep on')
     screen:expect([[
-      another {inc:on}e 2                 |
-      that {hl:on}e 3                    |
-      the {hl:on}e 1                     |
+      another {2:on}e 2                 |
+      that {10:on}e 3                    |
+      the {10:on}e 1                     |
       :vimgrep on^                   |
     ]])
     feed('<esc>')
 
     feed(':vimg /on/ *.txt')
     screen:expect([[
-      another {inc:on}e 2                 |
-      that {hl:on}e 3                    |
-      the {hl:on}e 1                     |
+      another {2:on}e 2                 |
+      that {10:on}e 3                    |
+      the {10:on}e 1                     |
       :vimg /on/ *.txt^              |
     ]])
     feed('<esc>')
 
     feed(':vimgrepadd "\\<LT>on')
     screen:expect([[
-      another {inc:on}e 2                 |
-      that {hl:on}e 3                    |
-      the {hl:on}e 1                     |
+      another {2:on}e 2                 |
+      that {10:on}e 3                    |
+      the {10:on}e 1                     |
       :vimgrepadd "\<on^             |
     ]])
     feed('<esc>')
@@ -625,7 +650,7 @@ describe('search cmdline', function()
     feed(':lv "tha')
     screen:expect([[
       another one 2                 |
-      {inc:tha}t one 3                    |
+      {2:tha}t one 3                    |
       the one 1                     |
       :lv "tha^                      |
     ]])
@@ -633,12 +658,78 @@ describe('search cmdline', function()
 
     feed(':lvimgrepa "the" **/*.txt')
     screen:expect([[
-      ano{inc:the}r one 2                 |
+      ano{2:the}r one 2                 |
       that one 3                    |
-      {hl:the} one 1                     |
+      {10:the} one 1                     |
       :lvimgrepa "the" **/*.txt^     |
     ]])
     feed('<esc>')
+  end)
+
+  -- oldtest: Test_incsearch_substitute_dump2()
+  it('incsearch detects empty pattern properly vim-patch:8.2.2295', function()
+    screen:try_resize(70, 6)
+    exec([[
+      set incsearch hlsearch scrolloff=0
+      for n in range(1, 4)
+        call setline(n, "foo " . n)
+      endfor
+      call setline(5, "abc|def")
+      3
+    ]])
+
+    feed([[:%s/\vabc|]])
+    screen:expect([[
+      foo 1                                                                 |
+      foo 2                                                                 |
+      foo 3                                                                 |
+      foo 4                                                                 |
+      abc|def                                                               |
+      :%s/\vabc|^                                                            |
+    ]])
+    feed('<Esc>')
+
+    -- The following should not be highlighted
+    feed([[:1,5s/\v|]])
+    screen:expect([[
+      foo 1                                                                 |
+      foo 2                                                                 |
+      foo 3                                                                 |
+      foo 4                                                                 |
+      abc|def                                                               |
+      :1,5s/\v|^                                                             |
+    ]])
+  end)
+
+  -- oldtest: Test_incsearch_restore_view()
+  it('incsearch restores viewport', function()
+    screen:try_resize(20, 6)
+    exec([[
+      set incsearch nohlsearch
+      setlocal scrolloff=0 smoothscroll
+      call setline(1, [join(range(25), ' '), '', '', '', '', 'xxx'])
+      call feedkeys("2\<C-E>", 't')
+    ]])
+    local s = [[
+      {1:<<<} 18 19 20 21 22 2|
+      ^3 24                |
+                          |*4
+    ]]
+    screen:expect(s)
+    feed('/xx')
+    screen:expect([[
+                          |*4
+      {2:xx}x                 |
+      /xx^                 |
+    ]])
+    feed('x')
+    screen:expect([[
+                          |*4
+      {2:xxx}                 |
+      /xxx^                |
+    ]])
+    feed('<Esc>')
+    screen:expect(s)
   end)
 end)
 
@@ -648,12 +739,6 @@ describe('Search highlight', function()
   -- oldtest: Test_hlsearch_dump()
   it('beyond line end vim-patch:8.2.2542', function()
     local screen = Screen.new(50, 6)
-    screen:set_default_attr_ids({
-      [1] = {bold = true, foreground = Screen.colors.Blue},  -- NonText
-      [2] = {background = Screen.colors.Yellow},  -- Search
-      [3] = {background = Screen.colors.Grey90},  -- CursorLine
-    })
-    screen:attach()
     exec([[
       set hlsearch noincsearch cursorline
       call setline(1, ["xxx", "xxx", "xxx"])
@@ -662,11 +747,9 @@ describe('Search highlight', function()
     ]])
     feed([[/\_.*<CR>]])
     screen:expect([[
-      {2:xxx }                                              |
-      {2:xxx }                                              |
-      {2:^xxx }{3:                                              }|
-      {1:~                                                 }|
-      {1:~                                                 }|
+      {10:xxx }                                              |*2
+      {10:^xxx }{21:                                              }|
+      {1:~                                                 }|*2
       /\_.*                                             |
     ]])
   end)
@@ -674,14 +757,14 @@ describe('Search highlight', function()
   -- oldtest: Test_hlsearch_and_visual()
   it('is combined with Visual highlight vim-patch:8.2.2797', function()
     local screen = Screen.new(40, 6)
-    screen:set_default_attr_ids({
-      [1] = {bold = true, foreground = Screen.colors.Blue},  -- NonText
-      [2] = {bold = true}, -- ModeMsg, Search
-      [3] = {background = Screen.colors.LightGrey},  -- Visual
-      [4] = {background = Screen.colors.Yellow, bold = true},  -- Search
-      [5] = {background = Screen.colors.LightGrey, bold = true},  -- Visual + Search
-    })
-    screen:attach()
+    screen:add_extra_attr_ids {
+      [100] = {
+        foreground = Screen.colors.Black,
+        bold = true,
+        background = Screen.colors.LightGrey,
+      },
+      [101] = { bold = true, background = Screen.colors.Yellow },
+    }
     exec([[
       set hlsearch noincsearch
       call setline(1, repeat(["xxx yyy zzz"], 3))
@@ -691,12 +774,11 @@ describe('Search highlight', function()
     ]])
     feed('vjj')
     screen:expect([[
-      xxx {4:y}{5:yy}{3: zzz}                             |
-      {3:xxx }{5:yyy}{3: zzz}                             |
-      {3:xxx }{5:y}{4:^yy} zzz                             |
-      {1:~                                       }|
-      {1:~                                       }|
-      {2:-- VISUAL --}                            |
+      xxx {101:y}{100:yy}{17: zzz}                             |
+      {17:xxx }{100:yyy}{17: zzz}                             |
+      {17:xxx }{100:y}{101:^yy} zzz                             |
+      {1:~                                       }|*2
+      {5:-- VISUAL --}                            |
     ]])
   end)
 end)
